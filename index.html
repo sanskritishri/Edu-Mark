@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EduMark — Attendance</title>
+  <style>
+    /* ===== Root & Reset ===== */
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --accent1:#2b6ef6; /* blue */
+      --accent2:#7c3aed; /* purple */
+      --muted:#6b7280;
+      --success:#10b981;
+      --danger:#ef4444;
+      --border:#e6e9ef;
+      --text:#0f172a;
+      --large-font:18px;
+      --input-padding:16px;
+      --radius:12px;
+      --btn-height:54px;
+      --select-arrow: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="%238b8b8b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>') no-repeat calc(100% - 14px) center;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #eaf2ff 0%, var(--bg) 100%);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;align-items:center;justify-content:center;padding:18px;
+      color:var(--text);
+    }
+
+    /* ===== App Shell ===== */
+    .app {
+      width:100%;
+      max-width:520px;
+      height: calc(100vh - 36px);
+      background: var(--card);
+      border-radius:16px;
+      box-shadow: 0 28px 60px rgba(10,20,40,0.12);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      position:relative;
+    }
+
+    /* ===== Splash overlay ===== */
+    .splash {
+      position:absolute;inset:0;z-index:60;
+      background:linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,250,252,0.98));
+      display:flex;align-items:center;justify-content:center;flex-direction:column;
+    }
+    .splash h1{font-size:28px;margin-bottom:10px;color:var(--accent1);font-weight:800}
+    .dots{display:flex;gap:6px}
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--accent1);opacity:0.2;animation:blink 1s infinite}
+    .dot:nth-child(1){animation-delay:0s}
+    .dot:nth-child(2){animation-delay:.15s}
+    .dot:nth-child(3){animation-delay:.3s}
+    @keyframes blink{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
+
+    /* ===== Top nav (persistent) ===== */
+    .topbar{
+      display:flex;align-items:center;gap:12px;padding:12px 14px;background: linear-gradient(90deg,var(--accent1),var(--accent2));color:white;
+    }
+    .top-left{display:flex;gap:8px;align-items:center;min-width:0}
+    .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:10px;background: rgba(255,255,255,0.12);border:none;cursor:pointer}
+    .icon-btn[disabled]{opacity:0.45;cursor:default}
+    .app-title{font-weight:700;font-size:18px;margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .top-right{margin-left:auto;font-size:13px;opacity:0.95}
+
+    /* ===== Body ===== */
+    .app-body{padding:18px;overflow:auto;flex:1;-webkit-overflow-scrolling:touch;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(250,250,252,1))}
+
+    .screen{display:block}
+    .hidden{display:none}
+
+    .card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:0 8px 24px rgba(12,22,46,0.04);margin-bottom:14px;border:1px solid var(--border)}
+
+    .field{margin-bottom:14px}
+    input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="date"], select, input[type="number"]{
+      width:100%;padding:var(--input-padding);border-radius:10px;border:1px solid var(--border);font-size:var(--large-font);background:white;color:var(--text);-webkit-appearance:none;-moz-appearance:none;appearance:none;
+    }
+    /* bigger arrow styling via background image (data URL) */
+    select { background-image: linear-gradient(45deg, transparent 50%, rgba(0,0,0,0.0) 50%), linear-gradient(135deg, rgba(0,0,0,0.0) 50%, transparent 50%); background-position: calc(100% - 26px) calc(50% + 1px), calc(100% - 21px) calc(50% + 1px); background-size: 8px 8px, 8px 8px; background-repeat: no-repeat; padding-right:44px; }
+    /* fallback arrow */
+    .select-wrap{position:relative}
+    .select-wrap::after{content:'';position:absolute;right:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M6 9l6 6 6-6\" stroke=\"%238b8b8b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>');background-size:18px 18px;background-repeat:no-repeat;pointer-events:none}
+
+    input:focus, select:focus{outline:none;box-shadow:0 12px 36px rgba(59,130,246,0.08);border-color: rgba(59,130,246,0.8)}
+
+    .btn{display:inline-block;width:100%;height:var(--btn-height);border-radius:12px;border:none;color:white;font-weight:800;font-size:16px;letter-spacing:0.2px;cursor:pointer;background:linear-gradient(90deg,var(--accent1),var(--accent2));box-shadow:0 12px 30px rgba(99,102,241,0.08);margin-top:6px}
+    .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border);font-weight:700}
+    .btn.small{height:44px;font-size:15px;border-radius:10px}
+
+    .muted{color:var(--muted);font-size:14px}
+
+    .dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .dash-card{background:linear-gradient(180deg, white, #fbfdff);border-radius:12px;padding:14px;text-align:center;cursor:pointer;border:1px solid var(--border);transition:transform .15s ease, box-shadow .15s}
+    .dash-card:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(12,22,46,0.06)}
+    .big{font-size:16px;font-weight:800;color:var(--text);margin-top:8px}
+    .small{font-size:14px;color:var(--muted)}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px;font-size:15px}
+    th,td{border:1px solid #f1f5f9;padding:10px;text-align:left}
+    thead th{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;font-weight:700}
+    tbody tr td{background:white}
+
+    .result{margin-top:12px;padding:12px;border-radius:10px;background:#ecfdf5;color:var(--success);font-weight:800;}
+    .danger{background:#ffecec;color:var(--danger);font-weight:800;padding:10px;border-radius:8px;margin-top:10px}
+
+    .footer{font-size:13px;color:var(--muted);text-align:center;margin-top:8px}
+
+    /* toast */
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;z-index:80;padding:12px 18px;border-radius:12px;color:white;font-weight:700;box-shadow:0 10px 30px rgba(2,6,23,0.12);opacity:0;pointer-events:none;transition:all .28s ease}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast.success{background:linear-gradient(90deg,#10b981,#06d6a0)}
+    .toast.error{background:linear-gradient(90deg,#ef4444,#fb7185)}
+
+    /* responsive */
+    @media (max-width:460px){
+      .app{max-width:100%}
+      .icon-btn{width:40px;height:40px}
+      input, select{font-size:18px;padding:14px}
+      .btn{height:50px;font-size:16px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="EduMark App">
+    <!-- Splash -->
+    <div class="splash" id="splash">
+      <h1>EduMark</h1>
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+
+    <!-- Topbar -->
+    <div class="topbar" role="navigation" aria-label="Top bar">
+      <div class="top-left">
+        <button id="navBack" class="icon-btn" title="Back" aria-label="Back" onclick="navBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M19 12H6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 19L5 12L12 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <button id="navHome" class="icon-btn" title="Home" aria-label="Home" onclick="goHome()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M3 9.5L12 3l9 6.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 22V12h6v10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <div style="margin-left:8px;min-width:0">
+          <div class="app-title" id="topTitle">EduMark</div>
+          <div style="font-size:12px;opacity:0.95">Local-first • Readable UI</div>
+        </div>
+      </div>
+
+      <div class="top-right" id="topUser">Not signed in</div>
+    </div>
+
+    <!-- Body -->
+    <div class="app-body">
+      <!-- LOGIN -->
+      <div class="screen" id="login-screen">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-weight:800;font-size:18px">Welcome to EduMark</div>
+          </div>
+
+          <div class="field"><input id="loginIdentifier" type="text" placeholder="Email or Phone or Username" autocomplete="username"></div>
+          <div class="field"><input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password"></div>
+
+          <div class="field select-wrap">
+            <select id="loginRole" style="font-size:18px;padding:14px 14px;">
+              <option value="">Select Role</option>
+              <option>Admin</option>
+              <option>Teacher</option>
+            </select>
+          </div>
+
+          <button class="btn" onclick="login()">Sign in</button>
+
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <button class="btn ghost" style="flex:1" onclick="mockSocial('google')">Sign in with Google</button>
+            <button class="btn ghost" style="flex:1" onclick="mockSocial('facebook')">Sign in with Facebook</button>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+            <div class="muted">Don't have an account?</div>
+            <button class="btn small ghost" onclick="showRegister()">Create account</button>
+          </div>
+
+          <div class="muted" style="margin-top:10px;font-size:13px">(Demo credentials: <strong>admin/admin123</strong>, <strong>teacher/teach123</strong>, <strong>stud123/stud123</strong>)</div>
+        </div>
+      </div>
+
+      <!-- REGISTER -->
+      <div class="screen hidden" id="register-screen">
+        <div class="card">
+          <div style="font-weight:800;font-size:18px;margin-bottom:8px">Create account</div>
+          <div class="field"><input id="regDisplay" type="text" placeholder="Full name (display)"></div>
+          <div class="field"><input id="regEmail" type="email" placeholder="Email (optional)"></div>
+          <div class="field"><input id="regPhone" type="tel" placeholder="Phone (optional)"></div>
+          <div class="field"><input id="regUsername" type="text" placeholder="Choose username"></div>
+          <div class="field"><input id="regPassword" type="password" placeholder="Create password"></div>
+          <div class="field select-wrap">
+            <select id="regRole" style="font-size:18px;padding:14px 14px;">
+              <option value="">Choose role</option>
+              <option>Admin</option>
+              <option>Teacher</option>
+            </select>
+          </div>
+
+          <button class="btn" onclick="register()">Create account</button>
+          <button class="btn small ghost" onclick="showLogin()" style="margin-top:8px">Back to sign in</button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="screen hidden" id="dashboard-screen">
+        <div class="card" style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1">
+            <div style="font-weight:800;font-size:18px" id="displayName">Hello</div>
+            <div class="muted" id="displayRole">Role</div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted" style="font-size:12px">Signed in as</div>
+            <div style="font-weight:700" id="displayIdentifier">you</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px" class="dash-grid">
+          <div class="dash-card" onclick="goToCourse()">
+            <div style="font-size:30px">🧾</div>
+            <div class="big">Take Attendance</div>
+            <div class="small">Submit today's count</div>
+          </div>
+
+          <div class="dash-card" onclick="viewAttendance()">
+            <div style="font-size:30px">📊</div>
+            <div class="big">View History</div>
+            <div class="small">Filter & search</div>
+          </div>
+
+          <div class="dash-card" onclick="showProfile()">
+            <div style="font-size:30px">👤</div>
+            <div class="big">Profile</div>
+            <div class="small">Edit or delete account</div>
+          </div>
+
+          <div class="dash-card" onclick="logout()">
+            <div style="font-size:30px">🚪</div>
+            <div class="big">Logout</div>
+            <div class="small">Sign out</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COURSE -->
+      <div class="screen hidden" id="course-screen">
+        <div class="card">
+          <div style="font-weight:800;margin-bottom:8px">Select Course</div>
+          <div class="field select-wrap">
+            <select id="courseSelect" style="font-size:18px;padding:16px 14px;">
+              <option value="">Select Course</option>
+              <option>B.Tech</option>
+              <option>MBA</option>
+              <option>BBA</option>
+              <option>BCA</option>
+              <option>B.Pharm</option>
+              <option>D.Pharm</option>
+              <option>Diploma</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <button class="btn" onclick="goToYear()">Next</button>
+            <button class="btn small ghost" onclick="backToDashboard()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- YEAR -->
+      <div class="screen hidden" id="year-screen">
+        <div class="card">
+          <div style="font-weight:800;margin-bottom:8px">Select Year</div>
+          <div class="field select-wrap">
+            <select id="yearSelect" style="font-size:18px;padding:16px 14px;">
+              <option value="">Select Year</option>
+              <option>1st Year</option>
+              <option>2nd Year</option>
+              <option>3rd Year</option>
+              <option>4th Year</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <button class="btn" onclick="goToSection()">Next</button>
+            <button class="btn small ghost" onclick="goBackToCourse()">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION -->
+      <div class="screen hidden" id="section-screen">
+        <div class="card">
+          <div style="font-weight:800;margin-bottom:8px">Select Section</div>
+          <div class="field select-wrap">
+            <select id="sectionSelect" style="font-size:18px;padding:16px 14px;">
+              <option value="">Select Section</option>
+              <option>AIML</option>
+              <option>B1</option>
+              <option>B2</option>
+              <option>B3</option>
+              <option>B4</option>
+              <option>B5</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <button class="btn" onclick="goToTakeAttendance()">Next</button>
+            <button class="btn small ghost" onclick="goBackToYear()">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAKE ATTENDANCE -->
+      <div class="screen hidden" id="attendance-screen">
+        <div class="card">
+          <div style="font-weight:800;margin-bottom:8px">Upload Attendance</div>
+          <div class="muted" id="attendanceDetails" style="margin-bottom:10px"></div>
+
+          <div class="field"><input id="presentCount" type="number" min="0" placeholder="Number of students present"></div>
+
+          <div style="display:flex;gap:10px">
+            <button class="btn" onclick="submitAttendance()">Submit</button>
+            <button class="btn small ghost" onclick="backToDashboard()">Cancel</button>
+          </div>
+
+          <div id="attendanceResult" class="result hidden"></div>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="screen hidden" id="history-screen">
+        <div class="card">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <div style="flex:1" class="select-wrap">
+              <select id="filterCourse" style="width:100%;font-size:16px;padding:12px;" onchange="filterHistory()">
+                <option value="">All Courses</option>
+                <option>B.Tech</option>
+                <option>MBA</option>
+                <option>BBA</option>
+                <option>BCA</option>
+                <option>B.Pharm</option>
+                <option>D.Pharm</option>
+                <option>Diploma</option>
+              </select>
+            </div>
+            <div style="flex:1" class="select-wrap">
+              <select id="filterYear" style="width:100%;font-size:16px;padding:12px;" onchange="filterHistory()">
+                <option value="">All Years</option>
+                <option>1st Year</option>
+                <option>2nd Year</option>
+                <option>3rd Year</option>
+                <option>4th Year</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input id="filterSection" type="text" placeholder="Section (e.g., B1) or leave blank" style="font-size:16px;padding:12px">
+            <input id="searchDate" type="date" onchange="filterByDate()" style="font-size:16px;padding:12px">
+          </div>
+
+          <div style="max-height:340px;overflow:auto">
+            <table>
+              <thead><tr><th>Date</th><th>Course</th><th>Year</th><th>Section</th><th>Present</th><th>Uploader</th></tr></thead>
+              <tbody id="historyBody"><tr><td colspan="6" class="muted">No records yet</td></tr></tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <button class="btn" onclick="clearFilters()">Clear Filters</button>
+            <button class="btn small ghost" onclick="backToDashboard()">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="screen hidden" id="profile-screen">
+        <div class="card">
+          <div style="font-weight:800;margin-bottom:8px">Your Profile</div>
+          <div class="field"><input id="profileDisplay" type="text" placeholder="Display Name"></div>
+          <div class="field"><input id="profileEmail" type="email" placeholder="Email"></div>
+          <div class="field"><input id="profilePhone" type="tel" placeholder="Phone"></div>
+          <div class="field"><input id="profileUsername" type="text" placeholder="Username (not editable)" disabled></div>
+
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <button class="btn" onclick="saveProfile()">Save</button>
+            <button class="btn small ghost" onclick="deleteAccount()" style="background:#ffecec;color:var(--danger);border:1px solid #ffd6d6">Delete Account</button>
+            <button class="btn small ghost" onclick="backToDashboard()">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">Local data stored on this device (localStorage). Social sign-ins are simulated.</div>
+    </div>
+
+    <!-- toast container -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script>
+    /***********************
+     * EduMark App Script
+     ***********************/
+    // Default demo users
+    const DEFAULT_USERS = [
+      { id: "u_admin", username: "admin", email: "admin@example.com", phone: "", password: "admin123", display: "Admin", role: "Admin", provider: "" },
+      { id: "u_teacher", username: "teacher", email: "teacher@example.com", phone: "", password: "teach123", display: "Teacher", role: "Teacher", provider: "" },
+      { id: "u_student", username: "stud123", email: "student@example.com", phone: "", password: "stud123", display: "Student", role: "Student", provider: "" }
+    ];
+
+    const toastEl = document.getElementById('toast');
+    function showToast(msg, type='success', timeout=2200){
+      toastEl.className = 'toast ' + (type === 'success' ? 'success' : 'error') + ' show';
+      toastEl.innerText = msg;
+      toastEl.style.transform = 'translateX(-50%) translateY(8px)';
+      if(window._toastTimer) clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(()=> {
+        toastEl.className = 'toast';
+        toastEl.style.transform = 'translateX(-50%) translateY(0)';
+      }, timeout);
+    }
+
+    function uid(prefix='id'){ return prefix + '_' + Math.random().toString(36).slice(2,9) }
+
+    // localStorage helpers
+    function getUsers(){ const r = localStorage.getItem('ed_users'); return r ? JSON.parse(r) : null }
+    function setUsers(u){ localStorage.setItem('ed_users', JSON.stringify(u)) }
+    function ensureDefaultUsers(){ if(!getUsers()) setUsers(DEFAULT_USERS.slice()) }
+
+    function getRecords(){ const r = localStorage.getItem('ed_records'); return r ? JSON.parse(r) : [] }
+    function setRecords(arr){ localStorage.setItem('ed_records', JSON.stringify(arr)) }
+
+    function getCurrentUser(){ const s=sessionStorage.getItem('ed_current'); return s ? JSON.parse(s) : null }
+    function setCurrentUser(u){ sessionStorage.setItem('ed_current', JSON.stringify(u)) }
+    function clearCurrentUser(){ sessionStorage.removeItem('ed_current') }
+
+    ensureDefaultUsers();
+
+    // Navigation stack
+    const navStack = [];
+    let currentScreen = 'login-screen';
+
+    // Splash logic
+    const splash = document.getElementById('splash');
+    setTimeout(()=> {
+      splash.style.transition = 'opacity .45s ease';
+      splash.style.opacity = '0';
+      setTimeout(()=> { splash.style.display = 'none'; initAfterSplash(); }, 450);
+    }, 900);
+
+    function initAfterSplash(){
+      const cur = getCurrentUser();
+      if(cur){ navStack.length = 0; onLoginSuccess(); } else { navStack.length = 0; showScreen('login-screen'); }
+    }
+
+    // UI helpers
+    function pushScreen(next){
+      if(currentScreen && currentScreen !== next) navStack.push(currentScreen);
+      showScreen(next);
+    }
+    function showScreen(id){
+      document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+      const el = document.getElementById(id);
+      if(!el) return console.warn('No screen:', id);
+      el.classList.remove('hidden');
+      currentScreen = id;
+      updateTopbar();
+      // scroll to top
+      document.querySelector('.app-body').scrollTop = 0;
+    }
+    function navBack(){
+      if(navStack.length === 0){
+        const cur = getCurrentUser();
+        if(cur){ goHome(); } else { showToast('No previous screen','error'); }
+        return;
+      }
+      const prev = navStack.pop();
+      showScreen(prev);
+    }
+    function goHome(){
+      const cur = getCurrentUser();
+      if(cur){ navStack.length = 0; showScreen('dashboard-screen'); } else { navStack.length = 0; showScreen('login-screen'); }
+    }
+    function updateTopbar(){
+      const user = getCurrentUser();
+      document.getElementById('topUser').innerText = user ? (user.display || user.username) : 'Not signed in';
+      const titles = {
+        'login-screen':'Sign in',
+        'register-screen':'Create account',
+        'dashboard-screen':'Dashboard',
+        'course-screen':'Select Course',
+        'year-screen':'Select Year',
+        'section-screen':'Select Section',
+        'attendance-screen':'Take Attendance',
+        'history-screen':'Attendance History',
+        'profile-screen':'Profile'
+      };
+      document.getElementById('topTitle').innerText = titles[currentScreen] || 'EduMark';
+    }
+
+    function toast(msg,type='success'){ showToast(msg,type) }
+
+    // Auth
+    function showRegister(){
+      document.getElementById('regDisplay').value='';
+      document.getElementById('regEmail').value='';
+      document.getElementById('regPhone').value='';
+      document.getElementById('regUsername').value='';
+      document.getElementById('regPassword').value='';
+      document.getElementById('regRole').value='';
+      pushScreen('register-screen');
+    }
+    function showLogin(){ pushScreen('login-screen') }
+
+    function register(){
+      const display = document.getElementById('regDisplay').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const phone = document.getElementById('regPhone').value.trim();
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const role = document.getElementById('regRole').value;
+      if(!username||!password||!role||!display){ toast('Fill display, username, password & role','error'); return; }
+      let users = getUsers() || [];
+      if(users.find(u=>u.username.toLowerCase()===username.toLowerCase())){ toast('Username taken','error'); return; }
+      if(email && users.find(u=>u.email && u.email.toLowerCase()===email.toLowerCase())){ toast('Email used','error'); return; }
+      if(phone && users.find(u=>u.phone && u.phone===phone)){ toast('Phone used','error'); return; }
+      const newUser = { id: uid('u'), username, email, phone, password, display, role, provider: '' };
+      users.push(newUser); setUsers(users);
+      toast('Account created — you can sign in now','success');
+      document.getElementById('loginIdentifier').value = username;
+      document.getElementById('loginRole').value = role;
+      navStack.length = 0; showScreen('login-screen');
+    }
+
+    function findUserByIdentifier(identifier){
+      if(!identifier) return null;
+      const users = getUsers() || [];
+      identifier = identifier.trim().toLowerCase();
+      return users.find(u => (u.username && u.username.toLowerCase()===identifier) || (u.email && u.email.toLowerCase()===identifier) || (u.phone && u.phone===identifier));
+    }
+
+    function login(){
+      const identifier = document.getElementById('loginIdentifier').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const role = document.getElementById('loginRole').value;
+      if(!identifier||!password||!role){ toast('Complete all login fields','error'); return; }
+      const user = findUserByIdentifier(identifier);
+      if(!user){ toast('No account found','error'); return; }
+      if(user.role !== role){ toast('Role mismatch','error'); return; }
+      if(user.password !== password){ toast('Incorrect password','error'); return; }
+      setCurrentUser(user);
+      navStack.length = 0;
+      onLoginSuccess();
+    }
+
+    function mockSocial(provider){
+      const prov = provider.toLowerCase();
+      const emailPrompt = prompt(`Enter ${provider} email to simulate sign-in:`) || '';
+      if(!emailPrompt){ toast('Social sign-in cancelled','error'); return; }
+      const email = emailPrompt.trim().toLowerCase();
+      let users = getUsers() || [];
+      let user = users.find(u => u.provider === prov && u.email && u.email.toLowerCase() === email);
+      if(!user){
+        const generatedUsername = email.split('@')[0] + '_' + prov;
+        user = { id: uid('s'), username: generatedUsername, email, phone:'', password:'', display:generatedUsername, role:'Teacher', provider:prov };
+        users.push(user); setUsers(users);
+      }
+      setCurrentUser(user);
+      navStack.length = 0;
+      onLoginSuccess();
+    }
+
+    // Post login
+    function onLoginSuccess(){
+      const u = getCurrentUser();
+      if(!u) return;
+      document.getElementById('displayName').innerText = u.display || u.username;
+      document.getElementById('displayRole').innerText = u.role || '';
+      document.getElementById('displayIdentifier').innerText = u.email || u.phone || u.username;
+      document.getElementById('profileDisplay').value = u.display || '';
+      document.getElementById('profileEmail').value = u.email || '';
+      document.getElementById('profilePhone').value = u.phone || '';
+      document.getElementById('profileUsername').value = u.username || '';
+      showScreen('dashboard-screen');
+    }
+
+    function logout(){ clearCurrentUser(); navStack.length = 0; showScreen('login-screen'); toast('Signed out','success') }
+
+    function showProfile(){ pushScreen('profile-screen') }
+    function saveProfile(){
+      const display = document.getElementById('profileDisplay').value.trim();
+      const email = document.getElementById('profileEmail').value.trim();
+      const phone = document.getElementById('profilePhone').value.trim();
+      const current = getCurrentUser();
+      if(!current) return toast('No active user','error');
+      let users = getUsers() || [];
+      if(email && users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase() && u.id !== current.id)){ toast('Email used by another','error'); return; }
+      if(phone && users.find(u => u.phone && u.phone === phone && u.id !== current.id)){ toast('Phone used by another','error'); return; }
+      users = users.map(u => u.id === current.id ? {...u, display, email, phone} : u);
+      setUsers(users);
+      const updated = users.find(u => u.id === current.id);
+      setCurrentUser(updated);
+      onLoginSuccess();
+      toast('Profile updated','success');
+    }
+
+    function deleteAccount(){
+      if(!confirm('Delete your account? This will remove your account from this device.')) return;
+      const cur = getCurrentUser(); if(!cur) return;
+      let users = getUsers() || [];
+      users = users.filter(u => u.id !== cur.id);
+      setUsers(users);
+      clearCurrentUser();
+      navStack.length = 0;
+      showScreen('login-screen');
+      toast('Account deleted','success');
+    }
+
+    // Attendance flow
+    function goToCourse(){ pushScreen('course-screen') }
+    function goToYear(){
+      const course = document.getElementById('courseSelect').value;
+      if(!course){ toast('Select a course','error'); return; }
+      sessionStorage.setItem('ed_course', course);
+      pushScreen('year-screen');
+    }
+    function goBackToCourse(){ navBack(); }
+    function goToSection(){
+      const year = document.getElementById('yearSelect').value;
+      if(!year){ toast('Select a year','error'); return; }
+      sessionStorage.setItem('ed_year', year);
+      pushScreen('section-screen');
+    }
+    function goBackToYear(){ navBack(); }
+    function goToTakeAttendance(){
+      const section = document.getElementById('sectionSelect').value;
+      if(!section){ toast('Select a section','error'); return; }
+      sessionStorage.setItem('ed_section', section);
+      const details = `${sessionStorage.getItem('ed_course') || ''} • ${sessionStorage.getItem('ed_year') || ''} • ${sessionStorage.getItem('ed_section') || ''}`;
+      document.getElementById('attendanceDetails').innerText = details;
+      document.getElementById('presentCount').value = '';
+      document.getElementById('attendanceResult').classList.add('hidden');
+      pushScreen('attendance-screen');
+    }
+
+    function submitAttendance(){
+      const count = parseInt(document.getElementById('presentCount').value, 10);
+      if(isNaN(count) || count < 0){ toast('Enter valid present count','error'); return; }
+      const current = getCurrentUser();
+      if(!current){ toast('No signed-in user','error'); return; }
+      const record = {
+        id: uid('r'),
+        course: sessionStorage.getItem('ed_course') || '',
+        year: sessionStorage.getItem('ed_year') || '',
+        section: sessionStorage.getItem('ed_section') || '',
+        presentCount: count,
+        uploaderName: current.display || current.username || current.email || current.phone,
+        uploaderId: current.id,
+        role: current.role,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: Date.now()
+      };
+      const all = getRecords(); all.push(record); setRecords(all);
+      const resBox = document.getElementById('attendanceResult');
+      resBox.innerText = `✅ Uploaded: ${record.presentCount} present\nBy ${record.uploaderName} on ${record.date}`;
+      resBox.classList.remove('hidden');
+      toast('Attendance saved locally','success');
+    }
+
+    // History
+    function viewAttendance(){ loadHistory(); pushScreen('history-screen'); }
+    function loadHistory(records = null){
+      let rows = records || getRecords();
+      rows = rows.sort((a,b) => b.timestamp - a.timestamp);
+      const tbody = document.getElementById('historyBody'); tbody.innerHTML = '';
+      if(!rows.length){ tbody.innerHTML = '<tr><td colspan="6" class="muted">No records found</td></tr>'; return; }
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.date}</td>
+                        <td>${r.course}</td>
+                        <td>${r.year}</td>
+                        <td>${r.section}</td>
+                        <td>${r.presentCount}</td>
+                        <td>${r.uploaderName}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterHistory(){
+      const course = document.getElementById('filterCourse').value;
+      const year = document.getElementById('filterYear').value;
+      const section = document.getElementById('filterSection').value.trim();
+      let all = getRecords();
+      if(course) all = all.filter(r => r.course === course);
+      if(year) all = all.filter(r => r.year === year);
+      if(section) all = all.filter(r => r.section.toLowerCase() === section.toLowerCase());
+      loadHistory(all);
+    }
+
+    function filterByDate(){
+      const date = document.getElementById('searchDate').value;
+      let all = getRecords();
+      if(date) all = all.filter(r => r.date === date);
+      loadHistory(all);
+    }
+
+    function clearFilters(){
+      document.getElementById('filterCourse').value = '';
+      document.getElementById('filterYear').value = '';
+      document.getElementById('filterSection').value = '';
+      document.getElementById('searchDate').value = '';
+      loadHistory();
+    }
+
+    function backToDashboard(){ navStack.length=0; showScreen('dashboard-screen'); }
+
+    // Auto-login if session exists
+    (function boot(){ const cur = getCurrentUser(); if(cur){ onLoginSuccess(); } else { navStack.length = 0; showScreen('login-screen'); } })();
+  </script>
+</body>
+</html>
